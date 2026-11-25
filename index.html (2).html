@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>进阶版生词复习游乐园</title>
+    <!-- 引入自动生成拼音的库 -->
+    <script src="https://unpkg.com/pinyin-pro"></script>
+    <style>
+        :root {
+            --primary: #4CAF50;
+            --secondary: #FF9800;
+            --bg: #F0F8FF;
+            --card-bg: #FFFFFF;
+            --text: #333333;
+        }
+        * { box-sizing: border-box; }
+        body { font-family: 'Comic Sans MS', 'Microsoft YaHei', sans-serif; margin: 0; display: flex; height: 100vh; background-color: var(--bg); color: var(--text); }
+        
+        /* 侧边栏导航 */
+        .sidebar { width: 250px; flex-shrink: 0; background: var(--card-bg); padding: 20px; box-shadow: 2px 0 10px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 10px; z-index: 10; overflow-y: auto; }
+        .sidebar h2 { text-align: center; color: var(--primary); font-size: 22px; margin: 0 0 6px 0; }
+        .sidebar-course-box { background: #F1F8E9; padding: 10px; border-radius: 10px; border: 1px solid #C8E6C9; margin-bottom: 4px; }
+        .sidebar-course-box label { display: block; font-size: 13px; color: #2E7D32; font-weight: bold; margin-bottom: 5px; }
+        .sidebar-course-box select { width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid #A5D6A7; font-size: 14px; background: white; }
+        .sidebar button { padding: 12px; border: none; border-radius: 10px; background: #E8F5E9; font-size: 16px; font-weight: bold; color: #2E7D32; cursor: pointer; transition: all 0.3s; text-align: left; padding-left: 18px; }
+        .sidebar button:hover { background: #C8E6C9; transform: translateY(-2px); }
+        .sidebar button.active { background: var(--primary); color: white; box-shadow: 0 4px 8px rgba(76, 175, 80, 0.4); }
+        .sidebar .btn-teacher { background: #FFF3E0; color: #E65100; margin-top: 14px; text-align: center; padding-left: 12px; }
+        .sidebar .btn-teacher.active { background: var(--secondary); color: white; }
+        
+        /* 内容区域 */
+        .content { flex-grow: 1; padding: 30px; overflow-y: auto; position: relative; }
+        .module { display: none; animation: fadeIn 0.4s; text-align: center; }
+        .module.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* 通用样式 */
+        .btn { padding: 10px 20px; font-size: 18px; border-radius: 8px; border: none; background: var(--secondary); color: white; cursor: pointer; margin: 10px; transition: 0.2s; box-shadow: 0 3px 6px rgba(0,0,0,0.1); }
+        .btn:hover { filter: brightness(1.1); transform: scale(1.05); }
+        .btn-blue { background: #2196F3; }
+        .btn-red { background: #F44336; }
+        .btn-green { background: #4CAF50; }
+        input[type="text"] { padding: 8px; font-size: 16px; border-radius: 5px; border: 1px solid #ccc; margin: 5px; outline: none; transition: 0.3s; }
+        input[type="text"]:focus { border-color: var(--primary); box-shadow: 0 0 5px rgba(76, 175, 80, 0.5); }
+
+        /* 进度条 */
+        .progress-container { width: 80%; height: 20px; background: #e0e0e0; border-radius: 10px; margin: 0 auto 20px; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); }
+        .progress-fill { height: 100%; background: var(--primary); width: 0%; transition: width 0.4s ease; }
+
+        /* 老师管理面板 */
+        .manage-panel { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: left; max-width: 850px; margin: 0 auto; }
+        .vocab-table { width: 100%; border-collapse: collapse; margin-top: 20px; text-align: left; }
+        .vocab-table th, .vocab-table td { padding: 12px; border-bottom: 1px solid #ddd; }
+        .vocab-table th { background: #f5f5f5; }
+        .share-box { background: #E8F5E9; padding: 15px; border-radius: 10px; border: 1px solid #A5D6A7; margin-top: 18px; }
+        .share-url-input { width: 100%; padding: 8px; font-size: 13px; border: 1px solid #81C784; border-radius: 6px; background: #fff; margin-top: 10px; color: #333; }
+
+        /* 板块一：生词卡片 */
+        .card-container { perspective: 1000px; width: 300px; height: 220px; margin: 30px auto; cursor: pointer; }
+        .card { width: 100%; height: 100%; transition: transform 0.6s; transform-style: preserve-3d; position: relative; }
+        .card.flipped { transform: rotateY(180deg); }
+        .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; background: white; border-radius: 20px; box-shadow: 0 8px 16px rgba(0,0,0,0.15); display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .card-back { transform: rotateY(180deg); background: #FFF3E0; }
+        .char-text { font-size: 60px; font-weight: bold; margin-bottom: 10px; }
+        .pinyin-text { font-size: 24px; color: #666; visibility: hidden; }
+        .meaning-text { font-size: 32px; color: #E65100; text-align: center; padding: 0 12px; }
+        .options-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; max-width: 600px; margin: 20px auto; }
+        .option-btn { padding: 15px; font-size: 22px; font-weight: bold; border-radius: 10px; border: 2px solid #ddd; background: white; cursor: pointer; transition: 0.2s; }
+        .option-btn:hover { border-color: var(--primary); background: #f9f9f9; }
+
+        /* 板块二：找不见 */
+        .missing-display { display: flex; justify-content: center; flex-wrap: wrap; gap: 20px; margin-bottom: 30px; font-size: 30px; }
+        .missing-box { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); min-width: 80px; text-align: center; }
+        .hidden-box { background: #eee; border: 2px dashed #aaa; color: transparent; }
+
+        /* 板块三：记忆接龙 */
+        .chain-grid { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; max-width: 600px; margin: 20px auto; }
+        .chain-btn { padding: 15px 25px; font-size: 24px; border-radius: 10px; border: 2px solid #2196F3; background: white; cursor: pointer; transition: 0.2s; }
+        .chain-btn.active-flash { background: #FFEB3B; transform: scale(1.1); box-shadow: 0 0 15px #FFEB3B; }
+        .chain-btn.success { background: #4CAF50; color: white; }
+        .chain-btn:active { transform: scale(0.95); }
+
+        /* 板块四：找不同 */
+        .diff-container { display: flex; justify-content: space-around; gap: 15px; margin-top: 30px; }
+        .diff-col { width: 48%; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); min-height: 200px; }
+        .diff-item { font-size: 24px; padding: 10px; margin: 8px; background: #f5f5f5; border-radius: 8px; cursor: pointer; display: inline-block; transition: 0.2s; border: 2px solid transparent; }
+        .diff-item:hover { background: #e0e0e0; }
+        .diff-item.found { background: #A5D6A7; border-color: #4CAF50; pointer-events: none; opacity: 0.8; }
+
+        /* 板块五：组词游戏 */
+        .mod5-layout { display: flex; justify-content: center; align-items: flex-start; gap: 30px; margin-top: 20px; flex-wrap: wrap; }
+        .grid-flex { display: flex; flex-wrap: wrap; gap: 15px; width: 400px; max-width: 100%; justify-content: center; }
+        .grid-cell { background: white; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; font-size: 36px; border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); cursor: pointer; transition: 0.3s; user-select: none; }
+        .grid-cell.selected { background: #FFF59D; transform: scale(1.05); }
+        .grid-cell.error { background: #EF9A9A; animation: shake 0.4s; }
+        .grid-cell.hidden { opacity: 0; transform: scale(0); pointer-events: none; }
+        .formed-words { width: 250px; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: left; }
+        .formed-words h3 { margin-top: 0; color: var(--primary); text-align: center; }
+        .formed-list { list-style: none; padding: 0; font-size: 28px; color: #333; }
+        .formed-list li { padding: 8px 0; border-bottom: 1px dashed #ccc; text-align: center; animation: fadeIn 0.3s; font-weight: bold; }
+
+        /* 板块六：我会写汉字 */
+        .multi-canvas-container { display: flex; justify-content: center; gap: 15px; margin: 20px auto; flex-wrap: wrap; }
+        .canvas-box { background: white; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); padding: 10px; }
+        canvas { border: 2px dashed #ccc; cursor: crosshair; touch-action: none; }
+        .write-prompt { font-size: 28px; font-weight: bold; color: var(--primary); margin-bottom: 15px; transition: 0.3s; }
+        .giant-char-box { width: 200px; height: 200px; background: #fff9c4; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); font-size: 100px; display: flex; align-items: center; justify-content: center; font-weight: bold; padding: 10px; margin: 0; border: 2px solid #ccc; color: #333; }
+
+        /* 板块七：补齐词语 */
+        .mod7-display { font-size: 70px; font-weight: bold; margin: 30px 0; display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
+        .char-box { background: white; width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; border-radius: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border: 2px solid #ddd; }
+        .missing-char-box { background: #fff9c4; width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; border-radius: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border: 3px dashed #FF9800; color: #FF9800; }
+        .mod7-pinyin { font-size: 32px; color: var(--primary); font-weight: bold; margin-bottom: 10px; }
+
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        #feedback { font-size: 22px; font-weight: bold; margin-top: 10px; min-height: 35px; color: #d32f2f; text-align: center; }
+
+        /* 手机/平板响应式适配 */
+        @media (max-width: 768px) {
+            body { flex-direction: column; height: auto; min-height: 100vh; }
+            .sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; justify-content: center; padding: 12px; gap: 8px; }
+            .sidebar h2 { width: 100%; font-size: 18px; }
+            .sidebar-course-box { width: 100%; }
+            .sidebar button { padding: 8px 12px; font-size: 14px; text-align: center; }
+            .sidebar .btn-teacher { margin-top: 0; }
+            .content { padding: 15px; }
+            .options-grid { grid-template-columns: 1fr; }
+            .diff-container { flex-direction: column; }
+            .diff-col { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 左侧导航栏 -->
+    <div class="sidebar">
+        <h2>📚 趣味学中文</h2>
+        <div class="sidebar-course-box">
+            <label for="sidebar-course-select" id="sidebar-course-label">📖 当前学习课程：</label>
+            <select id="sidebar-course-select" onchange="changeCourseFromSidebar()"></select>
+            <div id="sidebar-single-course" style="display:none; font-size:15px; font-weight:bold; color:#1B5E20; margin-top:4px;"></div>
+        </div>
+
+        <button class="active" data-mod="mod1" onclick="switchModule('mod1', this)">📖 一：生词复习</button>
+        <button data-mod="mod2" onclick="switchModule('mod2', this)">🕵️ 二：谁不见了</button>
+        <button data-mod="mod3" onclick="switchModule('mod3', this)">🔗 三：记忆接龙</button>
+        <button data-mod="mod4" onclick="switchModule('mod4', this)">🔎 四：找不同</button>
+        <button data-mod="mod5" onclick="switchModule('mod5', this)">🧩 五：组词游戏</button>
+        <button data-mod="mod6" onclick="switchModule('mod6', this)">✍️ 六：我会写汉字</button>
+        <button data-mod="mod7" onclick="switchModule('mod7', this)">🔠 七：补齐词语</button>
+        
+        <button id="btn-teacher-nav" class="btn-teacher" data-mod="mod0" onclick="switchModule('mod0', this)">⚙️ 老师词库管理</button>
+    </div>
+
+    <!-- 右侧内容区 -->
+    <div class="content">
+        <div id="feedback"></div>
+
+        <!-- 板块零：老师词库管理 -->
+        <div id="mod0" class="module">
+            <h2>⚙️ 课程与生词管理 (自动保存)</h2>
+            <div class="manage-panel">
+                <div>
+                    <label style="font-size: 18px; font-weight: bold;">当前课程：</label>
+                    <select id="course-select" onchange="changeCourse()" style="font-size: 18px; padding: 5px; border-radius: 5px;"></select>
+                    <button class="btn btn-blue" onclick="createNewCourse()">➕ 新建课程</button>
+                    <button class="btn btn-red" onclick="deleteCurrentCourse()">🗑️ 删除课程</button>
+                    <button class="btn" style="background:#78909C;" onclick="resetToDefault()">🔄 恢复默认词库</button>
+                </div>
+
+                <!-- 分享给学生区域 -->
+                <div class="share-box">
+                    <h3 style="margin-top:0; color:#2E7D32;">🔗 分享给学生使用（免改代码）</h3>
+                    <p style="margin: 5px 0 12px; color:#444; font-size:14px;">
+                        学生点开专属链接后，会自动隐藏“老师词库管理”按钮。想让学生只看到<b>他自己的那一课</b>，请先在上方选好课程，再点绿色按钮：
+                    </p>
+                    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+                        <button class="btn btn-green" style="margin: 0;" onclick="generateStudentLink('current')">🎯 仅分享【当前这一课】给学生</button>
+                        <button class="btn btn-blue" style="margin: 0; font-size:15px; padding:10px 15px;" onclick="generateStudentLink('all')">📚 分享【全部课程】</button>
+                    </div>
+                    <input type="text" id="student-link-output" class="share-url-input" readonly placeholder="点击上方按钮后，这里会生成学生专属链接..." onclick="this.select()">
+                    <div id="share-tip" style="font-size: 13px; color: #E65100; margin-top: 6px;"></div>
+                </div>
+
+                <hr style="margin: 20px 0;">
+                <div style="background: #F0F8FF; padding: 15px; border-radius: 10px; border: 1px solid #bbdefb;">
+                    <h3 style="margin-top:0; color:#1976D2;">✨ 极速添加生词</h3>
+                    <p style="color: #555; margin-bottom: 15px;">💡 <b>操作秘籍</b>：在汉字框输入后按 <kbd>Enter 键</kbd> 自动翻译，再按一次 <kbd>Enter 键</kbd> 直接录入系统！双手无需离开键盘。</p>
+                    
+                    <input type="text" id="new-word" placeholder="汉字 (如: 苹果)" required onkeydown="handleWordEnter(event)" onblur="handleWordBlur()">
+                    <input type="text" id="new-pinyin" placeholder="拼音 (自动生成)" required onkeydown="if(event.key==='Enter') addWord();">
+                    <input type="text" id="new-meaning" placeholder="含义 (自动生成)" required onkeydown="if(event.key==='Enter') addWord();">
+                    
+                    <button class="btn" onclick="addWord()">✅ 添加生词</button>
+                    <span id="autofill-tip" style="color: var(--primary); font-weight:bold; font-size: 16px; margin-left: 10px;"></span>
+                </div>
+                <table class="vocab-table">
+                    <thead><tr><th>汉字</th><th>拼音</th><th>含义</th><th>操作</th></tr></thead>
+                    <tbody id="vocab-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 板块一：复习与测验 -->
+        <div id="mod1" class="module active">
+            <h2>翻转字卡复习</h2>
+            <div id="review-section">
+                <div class="card-container" id="vocab-card" onclick="handleCardClick()">
+                    <div class="card" id="card-inner">
+                        <div class="card-face">
+                            <div class="char-text" id="card-char"></div>
+                            <div class="pinyin-text" id="card-pinyin"></div>
+                        </div>
+                        <div class="card-face card-back">
+                            <div class="meaning-text" id="card-meaning"></div>
+                        </div>
+                    </div>
+                </div>
+                <p>点击卡片显示拼音，再点击显示翻译</p>
+                <button class="btn" onclick="nextCard()">下一个生词 ➡️</button>
+                <br><br>
+                <button class="btn btn-blue" onclick="startMod1Game(1)">游戏1: 看拼音选词</button>
+                <button class="btn btn-blue" onclick="startMod1Game(2)">游戏2: 看含义选词</button>
+            </div>
+            <div id="mod1-game-section" style="display: none;">
+                <h2 id="mod1-game-prompt"></h2>
+                <div class="options-grid" id="mod1-options"></div>
+                <button class="btn" onclick="backToReview()">🔙 返回复习</button>
+            </div>
+        </div>
+
+        <!-- 板块二：谁不见了 -->
+        <div id="mod2" class="module">
+            <h2>谁不见了小游戏</h2>
+            <div class="progress-container"><div class="progress-fill" id="mod2-progress"></div></div>
+            <p>请找出下方被隐藏的生词！</p>
+            <div class="missing-display" id="missing-display"></div>
+            <h3 id="missing-prompt"></h3>
+            <div class="options-grid" id="missing-options" style="grid-template-columns: 1fr 1fr 1fr; max-width: 500px;"></div>
+        </div>
+
+        <!-- 板块三：点击式记忆接龙 -->
+        <div id="mod3" class="module">
+            <h2>点击记忆接龙 (Simon Says)</h2>
+            <p>观察系统或对手点击的词，按顺序重新点击它们！</p>
+            <div>
+                <input type="radio" name="chain-mode" id="mode-sys" checked onchange="initMod3()"> <label for="mode-sys">学生 vs 电脑系统</label> &nbsp;&nbsp;
+                <input type="radio" name="chain-mode" id="mode-teacher" onchange="initMod3()"> <label for="mode-teacher">学生 vs 老师/同学双打</label>
+            </div>
+            <h3 id="chain-status" style="color: var(--primary); margin-top: 20px;">准备开始...</h3>
+            <div class="chain-grid" id="chain-grid"></div>
+            <button class="btn btn-blue" onclick="startChainGame()">▶️ 开始接龙</button>
+        </div>
+
+        <!-- 板块四：找不同 -->
+        <div id="mod4" class="module">
+            <h2>找不同 (随机难度混合版)</h2>
+            <div id="mod4-settings" style="margin-bottom: 20px; background: #FFF3E0; padding: 15px; border-radius: 10px; max-width: 95%; width: max-content; margin: 0 auto 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                <label style="font-weight:bold; font-size:18px;">设定题目数量：</label>
+                <select id="mod4-q-count" style="font-size:16px; padding:5px; border-radius: 5px;">
+                    <option value="5">5 题</option>
+                    <option value="10">10 题</option>
+                    <option value="15">15 题</option>
+                    <option value="20">20 题</option>
+                    <option value="all" selected>所有生词轮一次 (默认)</option>
+                </select>
+                <button class="btn btn-red" style="margin:0 0 0 10px; padding: 6px 15px;" onclick="startMod4Game()">▶️ 开始游戏</button>
+            </div>
+            <div id="mod4-game-area" style="display:none;">
+                <div class="progress-container"><div class="progress-fill" id="mod4-progress"></div></div>
+                <p id="mod4-prompt">点击 B 组中多出来的词！</p>
+                <div class="diff-container">
+                    <div class="diff-col">
+                        <h3>A 组</h3>
+                        <div id="diff-A"></div>
+                    </div>
+                    <div class="diff-col">
+                        <h3>B 组</h3>
+                        <div id="diff-B"></div>
+                    </div>
+                </div>
+                <br>
+                <button class="btn btn-blue" onclick="initMod4()">🔙 结束并返回设置</button>
+            </div>
+        </div>
+
+        <!-- 板块五：组词游戏 -->
+        <div id="mod5" class="module">
+            <h2>汉字连连看（组词自动补充）</h2>
+            <p>连续点击两个单字组成正确的词语！组对后会自动补充新的汉字。</p>
+            <div class="mod5-layout">
+                <div class="grid-flex" id="word-grid"></div>
+                <div class="formed-words">
+                    <h3>📝 已组词汇</h3>
+                    <ul class="formed-list" id="formed-list"></ul>
+                </div>
+            </div>
+            <button class="btn" onclick="initMod5()" style="margin-top: 20px;">🔄 重新开始游戏</button>
+        </div>
+
+        <!-- 板块六：我会写汉字 -->
+        <div id="mod6" class="module">
+            <h2>我会写汉字</h2>
+            <div style="margin-bottom: 10px; font-size: 18px;">
+                <input type="radio" name="write-mode" id="write-pinyin" checked onchange="updateMod6Mode()"> <label for="write-pinyin">看拼音写</label> &nbsp;&nbsp;
+                <input type="radio" name="write-mode" id="write-meaning" onchange="updateMod6Mode()"> <label for="write-meaning">看含义写</label> &nbsp;&nbsp;
+                <input type="radio" name="write-mode" id="write-memory" onchange="updateMod6Mode()"> <label for="write-memory" style="color:#d32f2f; font-weight:bold;">⏳ 记忆补齐</label>
+            </div>
+            <div id="memory-settings" style="display:none; background: #FFF3E0; padding: 15px; border-radius: 10px; margin: 15px auto; max-width: 95%; width: max-content; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                <label style="font-weight:bold;">记忆倒计时：</label>
+                <select id="mem-time" style="font-size:16px; padding:5px; border-radius: 5px;">
+                    <option value="10">10 秒</option>
+                    <option value="20">20 秒</option>
+                    <option value="30">30 秒</option>
+                    <option value="60">60 秒</option>
+                </select>
+                &nbsp;&nbsp;&nbsp;&nbsp;
+                <label style="font-weight:bold;">默写模式：</label>
+                <select id="mem-hide-mode" style="font-size:16px; padding:5px; border-radius: 5px;">
+                    <option value="all">隐藏全部 (写出整个词)</option>
+                    <option value="partial">随机隐藏 (保留部分，补齐拼写)</option>
+                </select>
+                &nbsp;&nbsp;
+                <button class="btn btn-red" style="margin:0 0 0 10px; padding: 6px 15px;" onclick="startMemory()">▶️ 开始记忆</button>
+            </div>
+            <div class="write-prompt" id="write-prompt"></div>
+            <div class="multi-canvas-container" id="multi-canvas-container"></div>
+            <div style="margin-top: 15px;">
+                <button class="btn" onclick="clearAllCanvases()">🧹 清除画板</button>
+                <button class="btn btn-blue" onclick="nextWriteWord()">下一个词 ➡️</button>
+                <button class="btn" id="btn-show-answer" style="display:none; background:#4CAF50;" onclick="showAnswer()">👀 看答案</button>
+            </div>
+        </div>
+
+        <!-- 板块七：补齐词语 -->
+        <div id="mod7" class="module">
+            <h2>补齐词语 (填空挑战)</h2>
+            <div class="progress-container"><div class="progress-fill" id="mod7-progress"></div></div>
+            <p>请结合拼音，找出词语中不见的那一个汉字！</p>
+            <div id="mod7-game-area">
+                <div class="mod7-pinyin" id="mod7-pinyin"></div>
+                <div class="mod7-display" id="mod7-display"></div>
+                <div class="options-grid" id="mod7-options" style="grid-template-columns: 1fr 1fr; max-width: 400px; gap: 20px;"></div>
+            </div>
+        </div>
+
+    </div>
+
+<script>
+    // ================= 预设默认词库（老师也可直接在这里修改预设生词） =================
+    const defaultData = {
+        "第1课：我的学校": [
+            { word: "电脑", pinyin: "diàn nǎo", meaning: "Computer" },
+            { word: "苹果", pinyin: "píng guǒ", meaning: "Apple" },
+            { word: "学生", pinyin: "xué shēng", meaning: "Student" },
+            { word: "老师", pinyin: "lǎo shī", meaning: "Teacher" },
+            { word: "学校", pinyin: "xué xiào", meaning: "School" },
+            { word: "朋友", pinyin: "péng you", meaning: "Friend" },
+            { word: "高兴", pinyin: "gāo xìng", meaning: "Happy" }
+        ],
+        "第2课：日常生活": [
+            { word: "吃饭", pinyin: "chī fàn", meaning: "Eat meal" },
+            { word: "喝水", pinyin: "hē shuǐ", meaning: "Drink water" },
+            { word: "睡觉", pinyin: "shuì jiào", meaning: "Sleep" },
+            { word: "看书", pinyin: "kàn shū", meaning: "Read book" },
+            { word: "写字", pinyin: "xiě zì", meaning: "Write characters" },
+            { word: "回家", pinyin: "huí jiā", meaning: "Go home" }
+        ]
+    };
+
+    // ================= 链接参数解析（支持学生模式 & 分享词库） =================
+    function encodeCoursesToParam(dataObj) {
+        const compact = {};
+        Object.keys(dataObj).forEach(course => {
+            compact[course] = dataObj[course].map(item => [item.word, item.pinyin, item.meaning]);
+        });
+        const bytes = new TextEncoder().encode(JSON.stringify(compact));
+        let binStr = "";
+        bytes.forEach(b => binStr += String.fromCharCode(b));
+        return btoa(binStr).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    function decodeCoursesFromParam(encoded) {
+        let base64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+        while (base64.length % 4) base64 += '=';
+        const binStr = atob(base64);
+        const bytes = new Uint8Array(binStr.length);
+        for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
+        const compact = JSON.parse(new TextDecoder().decode(bytes));
+        const restored = {};
+        Object.keys(compact).forEach(course => {
+            restored[course] = compact[course].map(arr => ({ word: arr[0], pinyin: arr[1], meaning: arr[2] }));
+        });
+        return restored;
+    }
+
+    const urlQuery = new URLSearchParams(window.location.search);
+    const urlHash = new URLSearchParams(window.location.hash.startsWith('#') ? window.location.hash.slice(1) : '');
+    const isStudentMode = urlQuery.get('student') === '1' || urlHash.get('student') === '1';
+    const sharedDataParam = urlHash.get('data') || urlQuery.get('data');
+
+    let isUsingSharedData = false;
+    let coursesData = JSON.parse(JSON.stringify(defaultData));
+
+    if (sharedDataParam) {
+        try {
+            const decoded = decodeCoursesFromParam(sharedDataParam);
+            if (Object.keys(decoded).length > 0) {
+                coursesData = decoded;
+                isUsingSharedData = true;
+            }
+        } catch (e) {
+            console.error("分享词库解析失败，将使用默认词库", e);
+        }
+    } else {
+        const saved = localStorage.getItem('myChineseCourses');
+        if (saved) {
+            try { coursesData = JSON.parse(saved); } catch(e) {}
+        }
+    }
+
+    let savedActive = !isUsingSharedData ? localStorage.getItem('activeChineseCourse') : null;
+    let activeCourse = (savedActive && coursesData[savedActive]) ? savedActive : Object.keys(coursesData)[0];
+    let vocabList = coursesData[activeCourse];
+    let currentModuleId = 'mod1';
+
+    function saveData() {
+        vocabList = coursesData[activeCourse];
+        if (!isUsingSharedData) {
+            localStorage.setItem('myChineseCourses', JSON.stringify(coursesData));
+            localStorage.setItem('activeChineseCourse', activeCourse);
+        }
+        renderSidebarCourseSelect();
+    }
+
+    function renderSidebarCourseSelect() {
+        const select = document.getElementById("sidebar-course-select");
+        const singleEl = document.getElementById("sidebar-single-course");
+        const labelEl = document.getElementById("sidebar-course-label");
+        if (!select) return;
+
+        const courseNames = Object.keys(coursesData);
+        if (isStudentMode && courseNames.length === 1) {
+            labelEl.innerText = "📖 本次学习课程：";
+            select.style.display = "none";
+            singleEl.style.display = "block";
+            singleEl.innerText = `${courseNames[0]} (${coursesData[courseNames[0]].length}词)`;
+            return;
+        }
+
+        labelEl.innerText = "📖 当前学习课程：";
+        select.style.display = "block";
+        singleEl.style.display = "none";
+        select.innerHTML = "";
+        courseNames.forEach(cName => {
+            let opt = document.createElement("option");
+            opt.value = cName;
+            opt.innerText = `${cName} (${coursesData[cName].length}词)`;
+            if (cName === activeCourse) opt.selected = true;
+            select.appendChild(opt);
+        });
+    }
+
+    function changeCourseFromSidebar() {
+        activeCourse = document.getElementById("sidebar-course-select").value;
+        saveData();
+        showFeedback(`已切换至：${activeCourse}`);
+        if (currentModuleId === 'mod0') initMod0();
+        else switchModule(currentModuleId);
+    }
+
+    function shuffle(array) { let arr = [...array]; for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; }
+    function getWrongOptions(correctWord, prop, count) { let wrongs = Array.from(new Set(vocabList.filter(v => v.word !== correctWord).map(v => v[prop]))); wrongs = shuffle(wrongs).slice(0, count); while(wrongs.length < count && wrongs.length > 0) wrongs.push(wrongs[0]); return wrongs; }
+    function showFeedback(msg, isSuccess = true) { const f = document.getElementById("feedback"); f.style.color = isSuccess ? "green" : "red"; f.innerText = msg; setTimeout(() => f.innerText = "", 2500); }
+
+    function switchModule(modId, btnEl) {
+        if (vocabList.length < 4 && modId !== 'mod0') {
+            alert("当前课程生词太少（至少需要4个），" + (isStudentMode ? "请联系老师添加生词！" : "请先去【老师词库管理】添加生词！"));
+            if (!isStudentMode) modId = 'mod0';
+            else return;
+        }
+        currentModuleId = modId;
+        document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
+        document.querySelectorAll('.sidebar button').forEach(b => b.classList.remove('active'));
+        document.getElementById(modId).classList.add('active');
+        
+        const activeBtn = btnEl || document.querySelector(`.sidebar button[data-mod="${modId}"]`);
+        if (activeBtn) activeBtn.classList.add('active');
+        document.getElementById("feedback").innerText = "";
+        
+        if (typeof endMemoryTimer === 'function') endMemoryTimer();
+
+        if(modId === 'mod0') initMod0(); if(modId === 'mod1') initMod1(); if(modId === 'mod2') initMod2();
+        if(modId === 'mod3') initMod3(); if(modId === 'mod4') initMod4(); if(modId === 'mod5') initMod5();
+        if(modId === 'mod6') initMod6(); if(modId === 'mod7') initMod7();
+    }
+
+    // ================= 板块零：老师管理面板 =================
+    let lastFetchedWord = "";
+
+    function initMod0() {
+        const select = document.getElementById("course-select");
+        select.innerHTML = "";
+        Object.keys(coursesData).forEach(cName => {
+            let opt = document.createElement("option");
+            opt.value = cName;
+            opt.innerText = cName;
+            if(cName === activeCourse) opt.selected = true;
+            select.appendChild(opt);
+        });
+        renderVocabTable();
+    }
+
+    function generateStudentLink(scope = 'current') {
+        let dataToShare = {};
+        if (scope === 'current') {
+            if (!coursesData[activeCourse] || coursesData[activeCourse].length < 4) {
+                if (!confirm(`当前课程《${activeCourse}》生词不足 4 个，部分游戏可能无法开启，确定要继续生成链接吗？`)) {
+                    return;
+                }
+            }
+            dataToShare[activeCourse] = coursesData[activeCourse];
+        } else {
+            dataToShare = coursesData;
+        }
+
+        const baseUrl = window.location.origin + window.location.pathname;
+        const encoded = encodeCoursesToParam(dataToShare);
+        const shareUrl = `${baseUrl}#student=1&data=${encoded}`;
+        const inputEl = document.getElementById("student-link-output");
+        const tipEl = document.getElementById("share-tip");
+        inputEl.value = shareUrl;
+
+        const scopeLabel = scope === 'current' ? `【${activeCourse}】专属链接` : `【全部课程】链接`;
+
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(shareUrl).then(() => {
+                showFeedback(`✅ ${scopeLabel}已复制！可直接发给学生。`);
+            }).catch(() => {
+                inputEl.select();
+                showFeedback(`🔗 ${scopeLabel}已生成，请手动复制下方文本框内容！`);
+            });
+        } else {
+            inputEl.select();
+            try { document.execCommand('copy'); showFeedback(`✅ ${scopeLabel}已复制！`); }
+            catch(e) { showFeedback(`🔗 ${scopeLabel}已生成，请手动复制上方文本框内容！`); }
+        }
+
+        if (window.location.protocol === 'file:') {
+            tipEl.innerText = "⚠️ 提示：你现在是在本地电脑直接打开文件 (file://)，请先将本文件上传到 Netlify Drop / GitHub Pages 等平台变成 https:// 网址后，再点击生成链接发给学生哦！";
+        } else if (scope === 'current') {
+            tipEl.innerText = `✨ 已生成！学生打开后只会看到《${activeCourse}》这一课的内容，且隐藏老师管理按钮。`;
+        } else {
+            tipEl.innerText = "✨ 已生成！学生打开后可以看到全部课程，且隐藏老师管理按钮。";
+        }
+    }
+
+    function resetToDefault() {
+        if (confirm("确定要恢复为代码里的默认预设词库吗？当前网页手动修改的内容将被重置。")) {
+            localStorage.removeItem('myChineseCourses');
+            localStorage.removeItem('activeChineseCourse');
+            isUsingSharedData = false;
+            coursesData = JSON.parse(JSON.stringify(defaultData));
+            activeCourse = Object.keys(coursesData)[0];
+            saveData();
+            initMod0();
+            showFeedback("✅ 已恢复默认预设词库！");
+        }
+    }
+    
+    async function handleWordEnter(event) {
+        if(event.key === 'Enter') {
+            event.preventDefault();
+            let w = document.getElementById("new-word").value.trim();
+            let p = document.getElementById("new-pinyin").value.trim();
+            let m = document.getElementById("new-meaning").value.trim();
+            if (!w) return;
+            if (w !== lastFetchedWord || !p || !m) {
+                await autoFillWordData();
+                lastFetchedWord = w;
+            } else {
+                addWord();
+            }
+        }
+    }
+
+    async function handleWordBlur() {
+        let w = document.getElementById("new-word").value.trim();
+        if (w && w !== lastFetchedWord) {
+            await autoFillWordData();
+            lastFetchedWord = w;
+        }
+    }
+
+    async function autoFillWordData() { 
+        let wInput = document.getElementById("new-word").value.trim(); 
+        let pInput = document.getElementById("new-pinyin"); 
+        let mInput = document.getElementById("new-meaning"); 
+        let tip = document.getElementById("autofill-tip"); 
+        if (!wInput) return; 
+        
+        tip.innerText = "⏳ 正在自动生成..."; 
+        if (window.pinyinPro) pInput.value = pinyinPro.pinyin(wInput); 
+        
+        try { 
+            let res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=zh-CN&tl=en&dt=t&q=${encodeURIComponent(wInput)}`); 
+            let data = await res.json(); 
+            if(data && data[0] && data[0][0] && data[0][0][0]) mInput.value = data[0][0][0]; 
+            tip.innerText = "✨ 生成成功！(再次按 Enter 添加)"; 
+            setTimeout(() => tip.innerText="", 3000); 
+        } catch(e) { tip.innerText = "⚠️ 翻译失败，请手动填写。"; } 
+    }
+    
+    function changeCourse() { activeCourse = document.getElementById("course-select").value; saveData(); renderVocabTable(); showFeedback(`已切换至课程: ${activeCourse}`); }
+    function createNewCourse() { let name = prompt("请输入新课程名称："); if(name && !coursesData[name]) { coursesData[name] = []; activeCourse = name; saveData(); initMod0(); } }
+    function deleteCurrentCourse() { if(Object.keys(coursesData).length <= 1) return alert("至少保留一个课程！"); if(confirm(`确定要删除课程《${activeCourse}》吗？`)) { delete coursesData[activeCourse]; activeCourse = Object.keys(coursesData)[0]; saveData(); initMod0(); } }
+    
+    function addWord() { 
+        let w = document.getElementById("new-word").value.trim(); 
+        let p = document.getElementById("new-pinyin").value.trim(); 
+        let m = document.getElementById("new-meaning").value.trim(); 
+        if(!w || !p || !m) return alert("请填写完整信息！"); 
+        if(coursesData[activeCourse].find(x => x.word === w)) return alert("该生词已存在！"); 
+        
+        coursesData[activeCourse].push({word: w, pinyin: p, meaning: m}); 
+        saveData(); 
+        document.getElementById("new-word").value = ""; 
+        document.getElementById("new-pinyin").value = ""; 
+        document.getElementById("new-meaning").value = ""; 
+        lastFetchedWord = "";
+        renderVocabTable(); 
+        showFeedback("✅ 生词添加成功！"); 
+        document.getElementById("new-word").focus();
+    }
+    
+    function deleteWord(idx) { coursesData[activeCourse].splice(idx, 1); saveData(); renderVocabTable(); }
+    function renderVocabTable() { const tbody = document.getElementById("vocab-tbody"); tbody.innerHTML = ""; vocabList.forEach((v, idx) => { tbody.innerHTML += `<tr><td>${v.word}</td><td>${v.pinyin}</td><td>${v.meaning}</td><td><button class="btn btn-red" style="padding:5px 10px; margin:0;" onclick="deleteWord(${idx})">删除</button></td></tr>`; }); }
+
+    // ================= 板块一：生词复习 =================
+    let currentVocabIndex = 0; let cardState = 0;
+    function initMod1() { currentVocabIndex = 0; document.getElementById("review-section").style.display = "block"; document.getElementById("mod1-game-section").style.display = "none"; updateCardDisplay(); }
+    function updateCardDisplay() { const v = vocabList[currentVocabIndex]; document.getElementById("card-char").innerText = v.word; document.getElementById("card-pinyin").innerText = v.pinyin; document.getElementById("card-meaning").innerText = v.meaning; cardState = 0; document.getElementById("card-pinyin").style.visibility = "hidden"; document.getElementById("card-inner").classList.remove("flipped"); }
+    function handleCardClick() { if (cardState === 0) { document.getElementById("card-pinyin").style.visibility = "visible"; cardState = 1; } else if (cardState === 1) { document.getElementById("card-inner").classList.add("flipped"); cardState = 2; } else { document.getElementById("card-inner").classList.remove("flipped"); cardState = 1; } }
+    function nextCard() { currentVocabIndex++; if (currentVocabIndex >= vocabList.length) { currentVocabIndex = 0; showFeedback("已复习完本课所有生词！"); } updateCardDisplay(); }
+    let mod1CurrentGame = 1; let mod1Questions = []; let mod1QuestionIndex = 0;
+    function startMod1Game(type) { mod1CurrentGame = type; document.getElementById("review-section").style.display = "none"; document.getElementById("mod1-game-section").style.display = "block"; mod1Questions = shuffle([...vocabList]); mod1QuestionIndex = 0; renderMod1Game(); }
+    function renderMod1Game() { if (mod1QuestionIndex >= mod1Questions.length) { showFeedback("太棒了！测试通关！"); return backToReview(); } const q = mod1Questions[mod1QuestionIndex]; const optionsDiv = document.getElementById("mod1-options"); optionsDiv.innerHTML = ""; let correctOpt = "", wrongOpts = []; if (mod1CurrentGame === 1) { document.getElementById("mod1-game-prompt").innerText = `选出拼音对应的生词： ${q.pinyin}`; correctOpt = q.word; wrongOpts = getWrongOptions(q.word, 'word', 2); } else { document.getElementById("mod1-game-prompt").innerText = `选出含义对应的生词： ${q.meaning}`; correctOpt = `${q.word} (${q.pinyin})`; wrongOpts = shuffle(vocabList.filter(v => v.word !== q.word)).slice(0,2).map(v => `${v.word} (${v.pinyin})`); } shuffle([correctOpt, ...wrongOpts]).forEach(opt => { const btn = document.createElement("button"); btn.className = "option-btn"; btn.innerText = opt; btn.onclick = () => { if (opt === correctOpt) { showFeedback("✅ 回答正确！"); mod1QuestionIndex++; setTimeout(renderMod1Game, 800); } else showFeedback("❌ 答错了，再想想！", false); }; optionsDiv.appendChild(btn); }); }
+    function backToReview() { document.getElementById("review-section").style.display = "block"; document.getElementById("mod1-game-section").style.display = "none"; }
+
+    // ================= 板块二：谁不见了 =================
+    let mod2Queue = []; let mod2Total = 0; let missingStep = 1; let missingWordObj = null;
+    function initMod2() { mod2Queue = shuffle([...vocabList]); mod2Total = mod2Queue.length; updateMod2Progress(); document.getElementById("missing-display").innerHTML = ""; nextMod2Round(); }
+    function updateMod2Progress() { let percent = ((mod2Total - mod2Queue.length) / mod2Total) * 100; document.getElementById("mod2-progress").style.width = percent + "%"; }
+    function nextMod2Round() { 
+        if(mod2Queue.length === 0) { 
+            document.getElementById("mod2-progress").style.width = "100%"; showFeedback("🎉 恭喜！所有的词都找回来了！"); 
+            document.getElementById("missing-display").innerHTML = ""; 
+            document.getElementById("missing-options").innerHTML = "<button class='btn btn-blue' onclick='initMod2()'>🔄 重新开始游戏</button>"; 
+            document.getElementById("missing-prompt").innerText = "本轮复习圆满结束！"; return; 
+        } 
+        missingStep = 1; missingWordObj = mod2Queue.shift(); 
+        let others = vocabList.filter(v => v.word !== missingWordObj.word); 
+        let displayPool = shuffle([missingWordObj, ...others]); 
+        const display = document.getElementById("missing-display"); display.innerHTML = ""; 
+        displayPool.forEach(v => { 
+            const box = document.createElement("div"); 
+            if (v.word === missingWordObj.word) { 
+                box.className = "missing-box hidden-box"; box.innerText = "?"; box.id = "the-missing-box"; 
+            } else { 
+                box.className = "missing-box"; box.innerText = v.word; 
+            } 
+            display.appendChild(box); 
+        }); 
+        renderMissingStep(); 
+    }
+    function renderMissingStep() { const optionsDiv = document.getElementById("missing-options"); optionsDiv.innerHTML = ""; let correctOpt = missingStep === 1 ? missingWordObj.pinyin : missingWordObj.word; let wrongs = getWrongOptions(missingWordObj.word, missingStep === 1 ? 'pinyin' : 'word', 2); document.getElementById("missing-prompt").innerText = missingStep === 1 ? "第一步：选出不见生词的【拼音】" : "第二步：选出不见生词的【汉字】"; shuffle([correctOpt, ...wrongs]).forEach(opt => { const btn = document.createElement("button"); btn.className = "option-btn"; btn.innerText = opt; btn.onclick = () => { if (opt === correctOpt) { showFeedback("✅ 正确！"); if (missingStep === 1) { missingStep = 2; setTimeout(renderMissingStep, 600); } else { document.getElementById("the-missing-box").className = "missing-box"; document.getElementById("the-missing-box").innerText = missingWordObj.word; optionsDiv.innerHTML = ""; updateMod2Progress(); setTimeout(nextMod2Round, 1500); } } else showFeedback("❌ 不对哦！", false); }; optionsDiv.appendChild(btn); }); }
+
+    // ================= 板块三：点击记忆接龙 =================
+    let memorySequence = []; let playerStep = 0; let isInteractive = false;
+    function initMod3() { memorySequence = []; document.getElementById("chain-status").innerText = "准备开始..."; const grid = document.getElementById("chain-grid"); grid.innerHTML = ""; vocabList.forEach((v, idx) => { let btn = document.createElement("button"); btn.className = "chain-btn"; btn.innerText = v.word; btn.id = "chain-btn-" + idx; btn.onclick = () => handleChainClick(idx); grid.appendChild(btn); }); }
+    function startChainGame() { memorySequence = []; let isSys = document.getElementById("mode-sys").checked; if(isSys) sysAddWord(); else { document.getElementById("chain-status").innerText = "请玩家1 点击第一个词！"; isInteractive = true; playerStep = 0; } }
+    function sysAddWord() { isInteractive = false; let randomIdx = Math.floor(Math.random() * vocabList.length); memorySequence.push(randomIdx); document.getElementById("chain-status").innerText = "电脑演示中，请记忆..."; playSequence(0); }
+    function playSequence(idx) { if (idx >= memorySequence.length) { document.getElementById("chain-status").innerText = "轮到你了！请按顺序点击。"; playerStep = 0; isInteractive = true; return; } let btn = document.getElementById("chain-btn-" + memorySequence[idx]); btn.classList.add("active-flash"); setTimeout(() => { btn.classList.remove("active-flash"); setTimeout(() => playSequence(idx + 1), 300); }, 600); }
+    function handleChainClick(idx) { if(!isInteractive) return; let isSys = document.getElementById("mode-sys").checked; let btn = document.getElementById("chain-btn-" + idx); if(isSys) { if (idx === memorySequence[playerStep]) { btn.classList.add("success"); setTimeout(()=>btn.classList.remove("success"), 300); playerStep++; if (playerStep >= memorySequence.length) { showFeedback("✅ 完美记忆！进入下一轮"); setTimeout(sysAddWord, 1000); } } else { showFeedback("❌ 点错啦！游戏结束", false); isInteractive = false; document.getElementById("chain-status").innerText = `游戏结束！你记住了 ${memorySequence.length - 1} 个词。`; } } else { if (playerStep < memorySequence.length) { if(idx === memorySequence[playerStep]) { btn.classList.add("success"); setTimeout(()=>btn.classList.remove("success"), 300); playerStep++; if(playerStep === memorySequence.length) { document.getElementById("chain-status").innerText = "✅ 顺序正确！请再点击一个新词加入接龙。"; } } else { showFeedback("❌ 顺序点错啦！挑战失败", false); document.getElementById("chain-status").innerText = "游戏结束！"; isInteractive = false; } } else { memorySequence.push(idx); btn.classList.add("active-flash"); setTimeout(()=>btn.classList.remove("active-flash"), 300); playerStep = 0; document.getElementById("chain-status").innerText = "换对方按顺序点击了！"; } } }
+
+    // ================= 板块四：找不同 =================
+    let mod4TotalRounds = 5; let mod4CurrentRound = 0; let mod4Mode = 'all'; let mod4Queue = [];
+    function initMod4() { document.getElementById("mod4-settings").style.display = "block"; document.getElementById("mod4-game-area").style.display = "none"; }
+    function startMod4Game() { let val = document.getElementById("mod4-q-count").value; document.getElementById("mod4-settings").style.display = "none"; document.getElementById("mod4-game-area").style.display = "block"; if(val === 'all') { mod4Mode = 'all'; mod4Queue = shuffle([...vocabList]); mod4TotalRounds = mod4Queue.length; } else { mod4Mode = 'fixed'; mod4TotalRounds = parseInt(val); } mod4CurrentRound = 0; updateMod4Progress(); startMod4Round(); }
+    function updateMod4Progress() { let percent = (mod4CurrentRound / mod4TotalRounds) * 100; document.getElementById("mod4-progress").style.width = percent + "%"; }
+    function startMod4Round() { 
+        if(mod4CurrentRound >= mod4TotalRounds) { document.getElementById("mod4-progress").style.width = "100%"; document.getElementById("mod4-prompt").innerText = "🎉 太厉害了，本轮游戏圆满通关！"; document.getElementById("diff-A").innerHTML = ""; document.getElementById("diff-B").innerHTML = "<button class='btn btn-blue' onclick='initMod4()'>🔄 返回设置再玩一次</button>"; return; } 
+        mod4CurrentRound++; updateMod4Progress();
+        let extraWords = []; let diffsToFind = 0;
+        if (mod4Mode === 'all') { let randomDiff = Math.floor(Math.random() * 3) + 1; diffsToFind = Math.min(randomDiff, mod4Queue.length); for(let i=0; i<diffsToFind; i++) extraWords.push(mod4Queue.shift()); } 
+        else { let randomDiff = Math.floor(Math.random() * 3) + 1; diffsToFind = Math.min(randomDiff, vocabList.length); let shuffledVocab = shuffle([...vocabList]); for(let i=0; i<diffsToFind; i++) extraWords.push(shuffledVocab.shift()); }
+        let foundDiffs = 0; document.getElementById("mod4-prompt").innerHTML = `第 ${mod4CurrentRound} 关：点击 B 组中多出来的那 <strong style="color:red; font-size:24px;">${diffsToFind}</strong> 个词！`; 
+        let remainingVocab = vocabList.filter(v => !extraWords.includes(v)); let baseWords = shuffle(remainingVocab).slice(0, 4); let bWords = shuffle([...baseWords, ...extraWords]); 
+        const boxA = document.getElementById("diff-A"); boxA.innerHTML = ""; const boxB = document.getElementById("diff-B"); boxB.innerHTML = ""; 
+        baseWords.forEach(v => { let span = document.createElement("span"); span.className = "diff-item"; span.innerText = v.word; boxA.appendChild(span); }); 
+        bWords.forEach(v => { let span = document.createElement("span"); span.className = "diff-item"; span.innerText = v.word; span.onclick = () => { if (span.dataset.found) return; if (extraWords.includes(v)) { span.dataset.found = "true"; span.classList.add("found"); foundDiffs++; if(foundDiffs >= diffsToFind) { showFeedback("🎉 找齐啦！准备下一关..."); setTimeout(startMod4Round, 1500); } else { showFeedback(`✅ 找对一个！还剩 ${diffsToFind - foundDiffs} 个。`); } } else { span.style.background = "#EF9A9A"; showFeedback("❌ 找错了，这个词A组也有哦。", false); setTimeout(() => span.style.background = "#f5f5f5", 500); } }; boxB.appendChild(span); }); 
+    }
+
+    // ================= 板块五：组词游戏 =================
+    let mod5Queue = []; let selectedCells = [];
+    function initMod5() { const grid = document.getElementById("word-grid"); grid.innerHTML = ""; const list = document.getElementById("formed-list"); list.innerHTML = ""; selectedCells = []; let validWordsSet = new Set(); let uniqueWords = []; vocabList.forEach(v => { if(v.word.length === 2 && !validWordsSet.has(v.word)) { validWordsSet.add(v.word); uniqueWords.push(v); } }); if(uniqueWords.length === 0) { grid.innerHTML = "<h3>当前课程没有两字词汇，无法玩此游戏！</h3>"; return; } mod5Queue = shuffle(uniqueWords); let initialWords = mod5Queue.splice(0, 8); let chars = []; initialWords.forEach(v => { chars.push({ char: v.word[0] }); chars.push({ char: v.word[1] }); }); chars = shuffle(chars); chars.forEach((item) => { const cell = document.createElement("div"); cell.className = "grid-cell"; cell.innerText = item.char; cell.onclick = () => selectGridCell(cell); grid.appendChild(cell); }); }
+    function selectGridCell(cell) { if(cell.classList.contains("hidden") || cell.classList.contains("selected")) return; cell.classList.add("selected"); selectedCells.push(cell); if(selectedCells.length === 2) { let [c1, c2] = selectedCells; let word1 = c1.innerText + c2.innerText; let word2 = c2.innerText + c1.innerText; let isMatch = vocabList.find(v => v.word === word1 || v.word === word2); if (isMatch) { c1.classList.add("hidden"); c1.classList.remove("selected"); c2.classList.add("hidden"); c2.classList.remove("selected"); showFeedback(`✅ 组词成功：${isMatch.word}`); let li = document.createElement("li"); li.innerText = isMatch.word; document.getElementById("formed-list").appendChild(li); if(mod5Queue.length > 0) { let nextWordObj = mod5Queue.shift(); let newChars = shuffle([nextWordObj.word[0], nextWordObj.word[1]]); setTimeout(() => { c1.innerText = newChars[0]; c2.innerText = newChars[1]; c1.classList.remove("hidden"); c2.classList.remove("hidden"); }, 500); } else { setTimeout(() => { let allHidden = Array.from(document.querySelectorAll('.grid-cell')).every(el => el.classList.contains('hidden')); if(allHidden) { showFeedback("🎉 太棒了，所有的字都拼完了！"); let btn = document.createElement("button"); btn.className = "btn btn-blue"; btn.innerText = "🔄 再玩一次"; btn.onclick = initMod5; document.getElementById("word-grid").appendChild(btn); } }, 600); } } else { c1.classList.remove("selected"); c2.classList.remove("selected"); c1.classList.add("error"); c2.classList.add("error"); setTimeout(() => { c1.classList.remove("error"); c2.classList.remove("error"); }, 400); } selectedCells = []; } }
+
+    // ================= 板块六：我会写汉字 =================
+    let writeWordIndex = 0; let canvasContexts = []; let memState = 'idle'; let memHiddenIndices = []; let memTimer = null; let memTimeLeft = 0;
+    function initMod6() { writeWordIndex = 0; updateMod6Mode(); }
+    function endMemoryTimer() { if(memTimer) clearInterval(memTimer); }
+    function updateMod6Mode() { endMemoryTimer(); memState = 'idle'; const isMem = document.getElementById("write-memory").checked; document.getElementById("memory-settings").style.display = isMem ? "block" : "none"; document.getElementById("btn-show-answer").style.display = isMem ? "inline-block" : "none"; updateWritePrompt(); buildCanvases(); }
+    function updateWritePrompt() { const v = vocabList[writeWordIndex]; const isPinyin = document.getElementById("write-pinyin").checked; const isMeaning = document.getElementById("write-meaning").checked; const isMem = document.getElementById("write-memory").checked; const promptEl = document.getElementById("write-prompt"); if (isPinyin) { promptEl.innerText = `看拼音写字: ${v.pinyin}`; promptEl.style.color = "var(--primary)"; } else if (isMeaning) { promptEl.innerText = `看含义写字: ${v.meaning}`; promptEl.style.color = "var(--primary)"; } else if (isMem) { if (memState === 'idle') { promptEl.innerText = `准备记忆：${v.word} (${v.pinyin})`; promptEl.style.color = "var(--text)"; } else if (memState === 'memorizing') { promptEl.innerText = `⏳ 请快速记住生词！倒计时: ${memTimeLeft} 秒`; promptEl.style.color = "#d32f2f"; } else if (memState === 'writing') { promptEl.innerText = `✍️ 时间到！请写出隐藏的汉字。 (${v.pinyin})`; promptEl.style.color = "var(--primary)"; } } }
+    function nextWriteWord() { endMemoryTimer(); writeWordIndex++; if (writeWordIndex >= vocabList.length) writeWordIndex = 0; memState = 'idle'; updateWritePrompt(); buildCanvases(); }
+    function startMemory() { const v = vocabList[writeWordIndex]; const timeSelect = parseInt(document.getElementById("mem-time").value); const hideMode = document.getElementById("mem-hide-mode").value; memHiddenIndices = []; if (hideMode === 'all') { for(let i = 0; i < v.word.length; i++) memHiddenIndices.push(i); } else { memHiddenIndices.push(Math.floor(Math.random() * v.word.length)); } memTimeLeft = timeSelect; memState = 'memorizing'; updateWritePrompt(); buildCanvases(); endMemoryTimer(); memTimer = setInterval(() => { memTimeLeft--; updateWritePrompt(); if(memTimeLeft <= 0) { switchToWritingPhase(); } }, 1000); }
+    function switchToWritingPhase() { endMemoryTimer(); memState = 'writing'; updateWritePrompt(); buildCanvases(); }
+    function showAnswer() { if(memState !== 'writing') { showFeedback("目前还没有开始默写哦！", false); return; } const v = vocabList[writeWordIndex]; alert(`👀 正确答案是：【 ${v.word} 】`); }
+    function buildCanvases() { const container = document.getElementById("multi-canvas-container"); container.innerHTML = ""; canvasContexts = []; const currentWord = vocabList[writeWordIndex].word; const isMem = document.getElementById("write-memory").checked; if (isMem && memState === 'idle') { container.innerHTML = "<div style='color:#666; font-size:20px; padding: 40px;'>👆 请在上方选择设置后，点击【开始记忆】</div>"; return; } if (isMem && memState === 'memorizing') { for(let i = 0; i < currentWord.length; i++) { let box = document.createElement("div"); box.className = "giant-char-box"; box.innerText = currentWord[i]; container.appendChild(box); } let btnBox = document.createElement("div"); btnBox.style.width = "100%"; btnBox.style.textAlign = "center"; let skipBtn = document.createElement("button"); skipBtn.className = "btn"; skipBtn.innerText = "⏭️ 我记住了，跳过倒数"; skipBtn.onclick = switchToWritingPhase; btnBox.appendChild(skipBtn); container.appendChild(btnBox); return; } for(let i = 0; i < currentWord.length; i++) { if (isMem && memState === 'writing' && !memHiddenIndices.includes(i)) { let textNode = document.createElement("div"); textNode.className = "giant-char-box"; textNode.innerText = currentWord[i]; container.appendChild(textNode); } else { let box = document.createElement("div"); box.className = "canvas-box"; let cvs = document.createElement("canvas"); cvs.width = 200; cvs.height = 200; box.appendChild(cvs); container.appendChild(box); let ctx = cvs.getContext("2d"); ctx.lineWidth = 5; ctx.lineCap = "round"; ctx.strokeStyle = "#333"; canvasContexts.push({ canvas: cvs, ctx: ctx }); bindCanvasEvents(cvs, ctx); drawGrid(cvs, ctx); } } }
+    function bindCanvasEvents(canvas, ctx) { let isDrawing = false; canvas.onmousedown = (e) => { isDrawing = true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY); }; canvas.onmousemove = (e) => { if(isDrawing){ ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); } }; canvas.onmouseup = () => { isDrawing = false; }; canvas.onmouseout = () => { isDrawing = false; }; canvas.ontouchstart = (e) => { isDrawing = true; let rect = canvas.getBoundingClientRect(); ctx.beginPath(); ctx.moveTo(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top); e.preventDefault(); }; canvas.ontouchmove = (e) => { if(isDrawing){ let rect = canvas.getBoundingClientRect(); ctx.lineTo(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top); ctx.stroke(); } e.preventDefault(); }; canvas.ontouchend = () => { isDrawing = false; }; }
+    function drawGrid(canvas, ctx) { ctx.save(); ctx.strokeStyle = "#ffebee"; ctx.lineWidth = 2; ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(0, canvas.height/2); ctx.lineTo(canvas.width, canvas.height/2); ctx.moveTo(canvas.width/2, 0); ctx.lineTo(canvas.width/2, canvas.height); ctx.moveTo(0,0); ctx.lineTo(canvas.width, canvas.height); ctx.moveTo(canvas.width, 0); ctx.lineTo(0, canvas.height); ctx.stroke(); ctx.restore(); }
+    function clearAllCanvases() { canvasContexts.forEach(obj => { obj.ctx.clearRect(0, 0, obj.canvas.width, obj.canvas.height); drawGrid(obj.canvas, obj.ctx); }); }
+
+    // ================= 板块七：补齐词语 (填空挑战，已修复重玩报错) =================
+    let mod7Queue = []; let mod7Total = 0; let mod7CurrentWord = null; let mod7HiddenIndex = -1;
+    
+    function initMod7() {
+        const area = document.getElementById("mod7-game-area");
+        area.innerHTML = `
+            <div class="mod7-pinyin" id="mod7-pinyin"></div>
+            <div class="mod7-display" id="mod7-display"></div>
+            <div class="options-grid" id="mod7-options" style="grid-template-columns: 1fr 1fr; max-width: 400px; gap: 20px;"></div>
+        `;
+        let multiCharWords = vocabList.filter(v => v.word.length >= 2);
+        if (multiCharWords.length === 0) {
+            area.innerHTML = "<h3 style='margin-top: 40px;'>当前课程没有两个字及以上的词汇，无法玩此游戏！</h3>";
+            return;
+        }
+        mod7Queue = shuffle([...multiCharWords]);
+        mod7Total = mod7Queue.length;
+        updateMod7Progress();
+        nextMod7Round();
+    }
+
+    function updateMod7Progress() {
+        let percent = ((mod7Total - mod7Queue.length) / mod7Total) * 100;
+        document.getElementById("mod7-progress").style.width = percent + "%";
+    }
+
+    function nextMod7Round() {
+        if(mod7Queue.length === 0) {
+            document.getElementById("mod7-progress").style.width = "100%";
+            showFeedback("🎉 恭喜！所有的词汇都补齐了！");
+            document.getElementById("mod7-game-area").innerHTML = "<h3 style='margin-top: 30px; font-size:28px;'>本轮复习圆满结束！</h3><button class='btn btn-blue' onclick='initMod7()'>🔄 重新开始游戏</button>";
+            return;
+        }
+        mod7CurrentWord = mod7Queue.shift();
+        mod7HiddenIndex = Math.floor(Math.random() * mod7CurrentWord.word.length);
+
+        let displayHTML = "";
+        for(let i=0; i<mod7CurrentWord.word.length; i++) {
+            if(i === mod7HiddenIndex) {
+                displayHTML += `<span class="missing-char-box">?</span>`;
+            } else {
+                displayHTML += `<span class="char-box">${mod7CurrentWord.word[i]}</span>`;
+            }
+        }
+        document.getElementById("mod7-display").innerHTML = displayHTML;
+        document.getElementById("mod7-pinyin").innerText = mod7CurrentWord.pinyin;
+
+        let correctChar = mod7CurrentWord.word[mod7HiddenIndex];
+        let allChars = new Set();
+        vocabList.forEach(v => { for(let char of v.word) { allChars.add(char); } });
+        allChars.delete(correctChar);
+        
+        let wrongChars = shuffle(Array.from(allChars)).slice(0, 3);
+        const fallbackChars = ['人','天','大','小','上','下','好','去','来','一','不','是','有','我','他','这','的','学','生','师'];
+        let fallbackPool = shuffle(fallbackChars.filter(c => c !== correctChar));
+        while(wrongChars.length < 3) {
+            let c = fallbackPool.pop();
+            if(!wrongChars.includes(c)) wrongChars.push(c);
+        }
+
+        let options = shuffle([correctChar, ...wrongChars]);
+        let optionsDiv = document.getElementById("mod7-options");
+        optionsDiv.innerHTML = "";
+
+        options.forEach(opt => {
+            let btn = document.createElement("button");
+            btn.className = "option-btn";
+            btn.innerText = opt;
+            btn.onclick = () => {
+                if(opt === correctChar) {
+                    showFeedback("✅ 回答正确！");
+                    btn.style.background = "#A5D6A7";
+                    document.querySelector(".missing-char-box").innerText = correctChar;
+                    document.querySelector(".missing-char-box").classList.replace("missing-char-box", "char-box");
+                    optionsDiv.innerHTML = "";
+                    updateMod7Progress();
+                    setTimeout(nextMod7Round, 1200);
+                } else {
+                    showFeedback("❌ 不对哦，再想想！", false);
+                    btn.style.background = "#EF9A9A";
+                    setTimeout(()=> btn.style.background = "white", 500);
+                }
+            };
+            optionsDiv.appendChild(btn);
+        });
+    }
+
+    // 初始化
+    window.onload = () => {
+        if (isStudentMode) {
+            document.getElementById("btn-teacher-nav").style.display = "none";
+        }
+        renderSidebarCourseSelect();
+        initMod1();
+    };
+</script>
+</body>
+</html>
