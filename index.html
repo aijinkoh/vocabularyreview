@@ -53,8 +53,11 @@
         .vocab-table { width: 100%; border-collapse: collapse; margin-top: 20px; text-align: left; }
         .vocab-table th, .vocab-table td { padding: 12px; border-bottom: 1px solid #ddd; }
         .vocab-table th { background: #f5f5f5; }
-        .share-box { background: #E8F5E9; padding: 15px; border-radius: 10px; border: 1px solid #A5D6A7; margin-top: 18px; }
-        .share-url-input { width: 100%; padding: 8px; font-size: 13px; border: 1px solid #81C784; border-radius: 6px; background: #fff; margin-top: 10px; color: #333; }
+        .share-box { background: #E8F5E9; padding: 16px; border-radius: 10px; border: 1px solid #A5D6A7; margin-top: 18px; }
+        .share-url-input { width: 100%; padding: 9px; font-size: 14px; border: 1px solid #81C784; border-radius: 6px; background: #fff; margin-top: 10px; color: #333; font-weight: bold; }
+        .sync-status { padding: 8px 12px; border-radius: 6px; font-size: 14px; font-weight: bold; margin-bottom: 12px; }
+        .sync-ok { background: #C8E6C9; color: #1B5E20; }
+        .sync-warn { background: #FFE0B2; color: #E65100; }
 
         /* 板块一：生词卡片 */
         .card-container { perspective: 1000px; width: 300px; height: 220px; margin: 30px auto; cursor: pointer; }
@@ -166,20 +169,24 @@
                     <select id="course-select" onchange="changeCourse()" style="font-size: 18px; padding: 5px; border-radius: 5px;"></select>
                     <button class="btn btn-blue" onclick="createNewCourse()">➕ 新建课程</button>
                     <button class="btn btn-red" onclick="deleteCurrentCourse()">🗑️ 删除课程</button>
-                    <button class="btn" style="background:#78909C;" onclick="resetToDefault()">🔄 恢复默认词库</button>
+                    <button class="btn" style="background:#78909C;" onclick="syncFromCloud()">☁️ 从 GitHub 同步词库</button>
                 </div>
 
-                <!-- 分享给学生区域 -->
+                <!-- GitHub 超短链接分享区域 -->
                 <div class="share-box">
-                    <h3 style="margin-top:0; color:#2E7D32;">🔗 分享给学生使用（免改代码）</h3>
+                    <h3 style="margin-top:0; color:#2E7D32;">🔗 生成 GitHub 超短学生链接（推荐）</h3>
+                    <div id="sync-status-banner" class="sync-status sync-warn">正在检查云端词库状态...</div>
                     <p style="margin: 5px 0 12px; color:#444; font-size:14px;">
-                        学生点开专属链接后，会自动隐藏“老师词库管理”按钮。想让学生只看到<b>他自己的那一课</b>，请先在上方选好课程，再点绿色按钮：
+                        <b>两步让链接变得又短又安全：</b><br>
+                        1️⃣ 每次加完或改完生词，点下方 <b>【导出词库文件】</b>，把下载的 <code>lessons.json</code> 传进 GitHub 仓库（等1分钟生效）；<br>
+                        2️⃣ 选好上面要发给学生的那一课，点 <b>【复制当前这一课的超短链接】</b> 发给学生即可！
                     </p>
                     <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
-                        <button class="btn btn-green" style="margin: 0;" onclick="generateStudentLink('current')">🎯 仅分享【当前这一课】给学生</button>
-                        <button class="btn btn-blue" style="margin: 0; font-size:15px; padding:10px 15px;" onclick="generateStudentLink('all')">📚 分享【全部课程】</button>
+                        <button class="btn" style="margin: 0; background:#5C6BC0;" onclick="downloadLessonsJson()">💾 1. 导出词库文件 (lessons.json)</button>
+                        <button class="btn btn-green" style="margin: 0;" onclick="generateShortStudentLink('current')">🎯 2. 复制【当前这一课】超短链接</button>
+                        <button class="btn btn-blue" style="margin: 0; font-size:15px; padding:10px 15px;" onclick="generateShortStudentLink('all')">📚 复制【全部课程】超短链接</button>
                     </div>
-                    <input type="text" id="student-link-output" class="share-url-input" readonly placeholder="点击上方按钮后，这里会生成学生专属链接..." onclick="this.select()">
+                    <input type="text" id="student-link-output" class="share-url-input" readonly placeholder="点击上方按钮后，这里会生成超短学生链接..." onclick="this.select()">
                     <div id="share-tip" style="font-size: 13px; color: #E65100; margin-top: 6px;"></div>
                 </div>
 
@@ -348,7 +355,7 @@
     </div>
 
 <script>
-    // ================= 预设默认词库（老师也可直接在这里修改预设生词） =================
+    // ================= 预设默认词库 =================
     const defaultData = {
         "第1课：我的学校": [
             { word: "电脑", pinyin: "diàn nǎo", meaning: "Computer" },
@@ -358,29 +365,10 @@
             { word: "学校", pinyin: "xué xiào", meaning: "School" },
             { word: "朋友", pinyin: "péng you", meaning: "Friend" },
             { word: "高兴", pinyin: "gāo xìng", meaning: "Happy" }
-        ],
-        "第2课：日常生活": [
-            { word: "吃饭", pinyin: "chī fàn", meaning: "Eat meal" },
-            { word: "喝水", pinyin: "hē shuǐ", meaning: "Drink water" },
-            { word: "睡觉", pinyin: "shuì jiào", meaning: "Sleep" },
-            { word: "看书", pinyin: "kàn shū", meaning: "Read book" },
-            { word: "写字", pinyin: "xiě zì", meaning: "Write characters" },
-            { word: "回家", pinyin: "huí jiā", meaning: "Go home" }
         ]
     };
 
-    // ================= 链接参数解析（支持学生模式 & 分享词库） =================
-    function encodeCoursesToParam(dataObj) {
-        const compact = {};
-        Object.keys(dataObj).forEach(course => {
-            compact[course] = dataObj[course].map(item => [item.word, item.pinyin, item.meaning]);
-        });
-        const bytes = new TextEncoder().encode(JSON.stringify(compact));
-        let binStr = "";
-        bytes.forEach(b => binStr += String.fromCharCode(b));
-        return btoa(binStr).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    }
-
+    // ================= 链接参数 & 云端词库解析 =================
     function decodeCoursesFromParam(encoded) {
         let base64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
         while (base64.length % 4) base64 += '=';
@@ -397,33 +385,55 @@
 
     const urlQuery = new URLSearchParams(window.location.search);
     const urlHash = new URLSearchParams(window.location.hash.startsWith('#') ? window.location.hash.slice(1) : '');
-    const isStudentMode = urlQuery.get('student') === '1' || urlHash.get('student') === '1';
+    const isStudentMode = urlQuery.get('s') === '1' || urlQuery.get('student') === '1' || urlHash.get('student') === '1';
+    const targetCourseParam = urlQuery.get('c');
     const sharedDataParam = urlHash.get('data') || urlQuery.get('data');
 
     let isUsingSharedData = false;
+    let remoteLessonsData = null;
     let coursesData = JSON.parse(JSON.stringify(defaultData));
-
-    if (sharedDataParam) {
-        try {
-            const decoded = decodeCoursesFromParam(sharedDataParam);
-            if (Object.keys(decoded).length > 0) {
-                coursesData = decoded;
-                isUsingSharedData = true;
-            }
-        } catch (e) {
-            console.error("分享词库解析失败，将使用默认词库", e);
-        }
-    } else {
-        const saved = localStorage.getItem('myChineseCourses');
-        if (saved) {
-            try { coursesData = JSON.parse(saved); } catch(e) {}
-        }
-    }
-
-    let savedActive = !isUsingSharedData ? localStorage.getItem('activeChineseCourse') : null;
-    let activeCourse = (savedActive && coursesData[savedActive]) ? savedActive : Object.keys(coursesData)[0];
+    let activeCourse = Object.keys(coursesData)[0];
     let vocabList = coursesData[activeCourse];
     let currentModuleId = 'mod1';
+
+    async function fetchRemoteLessons() {
+        if (window.location.protocol === 'file:') return null;
+        try {
+            const res = await fetch(`./lessons.json?t=${Date.now()}`, { cache: 'no-store' });
+            if (!res.ok) return null;
+            const json = await res.json();
+            if (json && typeof json === 'object' && Object.keys(json).length > 0) {
+                return json;
+            }
+        } catch (e) {
+            return null;
+        }
+        return null;
+    }
+
+    function updateSyncBanner() {
+        const banner = document.getElementById("sync-status-banner");
+        if (!banner) return;
+        if (window.location.protocol === 'file:') {
+            banner.className = "sync-status sync-warn";
+            banner.innerText = "⚠️ 当前为本地打开文件，上传到 GitHub 后才能使用短链接功能。";
+            return;
+        }
+        if (!remoteLessonsData) {
+            banner.className = "sync-status sync-warn";
+            banner.innerText = "⚠️ GitHub 仓库里还没有 lessons.json！请先点下方【1. 导出词库文件】，上传到 GitHub 仓库后再发短链接给学生。";
+            return;
+        }
+        const localStr = JSON.stringify(coursesData);
+        const remoteStr = JSON.stringify(remoteLessonsData);
+        if (localStr === remoteStr) {
+            banner.className = "sync-status sync-ok";
+            banner.innerText = "✅ 已与 GitHub 云端 lessons.json 同步！可以直接复制下方超短链接发给学生。";
+        } else {
+            banner.className = "sync-status sync-warn";
+            banner.innerText = "⚠️ 你刚修改了生词，尚未同步到 GitHub！请点【1. 导出词库文件】并上传覆盖 GitHub 里的 lessons.json。";
+        }
+    }
 
     function saveData() {
         vocabList = coursesData[activeCourse];
@@ -432,6 +442,7 @@
             localStorage.setItem('activeChineseCourse', activeCourse);
         }
         renderSidebarCourseSelect();
+        updateSyncBanner();
     }
 
     function renderSidebarCourseSelect() {
@@ -510,33 +521,54 @@
             select.appendChild(opt);
         });
         renderVocabTable();
+        updateSyncBanner();
     }
 
-    function generateStudentLink(scope = 'current') {
-        let dataToShare = {};
+    function downloadLessonsJson() {
+        const jsonStr = JSON.stringify(coursesData, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'lessons.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showFeedback("✅ 已下载 lessons.json！请把它上传到 GitHub 仓库里。");
+    }
+
+    function generateShortStudentLink(scope = 'current') {
+        const courseNames = Object.keys(coursesData);
+        let cleanPath = window.location.pathname;
+        if (window.location.protocol !== 'file:') {
+            cleanPath = cleanPath.replace(/index\.html$/, '');
+        }
+        const baseUrl = window.location.origin + cleanPath;
+
+        let shareUrl = "";
+        let scopeLabel = "";
         if (scope === 'current') {
             if (!coursesData[activeCourse] || coursesData[activeCourse].length < 4) {
                 if (!confirm(`当前课程《${activeCourse}》生词不足 4 个，部分游戏可能无法开启，确定要继续生成链接吗？`)) {
                     return;
                 }
             }
-            dataToShare[activeCourse] = coursesData[activeCourse];
+            const idx = courseNames.indexOf(activeCourse);
+            shareUrl = `${baseUrl}?s=1&c=${idx}`;
+            scopeLabel = `【${activeCourse}】超短链接`;
         } else {
-            dataToShare = coursesData;
+            shareUrl = `${baseUrl}?s=1`;
+            scopeLabel = `【全部课程】超短链接`;
         }
 
-        const baseUrl = window.location.origin + window.location.pathname;
-        const encoded = encodeCoursesToParam(dataToShare);
-        const shareUrl = `${baseUrl}#student=1&data=${encoded}`;
         const inputEl = document.getElementById("student-link-output");
         const tipEl = document.getElementById("share-tip");
         inputEl.value = shareUrl;
 
-        const scopeLabel = scope === 'current' ? `【${activeCourse}】专属链接` : `【全部课程】链接`;
-
         if (navigator.clipboard && window.isSecureContext) {
             navigator.clipboard.writeText(shareUrl).then(() => {
-                showFeedback(`✅ ${scopeLabel}已复制！可直接发给学生。`);
+                showFeedback(`✅ ${scopeLabel}已复制！`);
             }).catch(() => {
                 inputEl.select();
                 showFeedback(`🔗 ${scopeLabel}已生成，请手动复制下方文本框内容！`);
@@ -547,25 +579,29 @@
             catch(e) { showFeedback(`🔗 ${scopeLabel}已生成，请手动复制上方文本框内容！`); }
         }
 
-        if (window.location.protocol === 'file:') {
-            tipEl.innerText = "⚠️ 提示：你现在是在本地电脑直接打开文件 (file://)，请先将本文件上传到 Netlify Drop / GitHub Pages 等平台变成 https:// 网址后，再点击生成链接发给学生哦！";
+        if (!remoteLessonsData || JSON.stringify(coursesData) !== JSON.stringify(remoteLessonsData)) {
+            tipEl.innerText = "⚠️ 别忘了先点【1. 导出词库文件】并把 lessons.json 上传到 GitHub，学生打开这个短链接才会看到最新生词哦！";
         } else if (scope === 'current') {
-            tipEl.innerText = `✨ 已生成！学生打开后只会看到《${activeCourse}》这一课的内容，且隐藏老师管理按钮。`;
+            tipEl.innerText = `✨ 已复制！学生打开后只会看到《${activeCourse}》这一课，且隐藏老师后台。`;
         } else {
-            tipEl.innerText = "✨ 已生成！学生打开后可以看到全部课程，且隐藏老师管理按钮。";
+            tipEl.innerText = "✨ 已复制！学生打开后可以看到全部课程，且隐藏老师后台。";
         }
     }
 
-    function resetToDefault() {
-        if (confirm("确定要恢复为代码里的默认预设词库吗？当前网页手动修改的内容将被重置。")) {
-            localStorage.removeItem('myChineseCourses');
-            localStorage.removeItem('activeChineseCourse');
-            isUsingSharedData = false;
-            coursesData = JSON.parse(JSON.stringify(defaultData));
+    async function syncFromCloud() {
+        const latest = await fetchRemoteLessons();
+        if (!latest) {
+            alert("GitHub 仓库里还没有检测到 lessons.json 文件哦！请先点击【1. 导出词库文件】并上传到 GitHub。");
+            return;
+        }
+        if (confirm("确定要用 GitHub 云端 lessons.json 的内容覆盖当前浏览器里的词库吗？")) {
+            remoteLessonsData = latest;
+            coursesData = JSON.parse(JSON.stringify(latest));
             activeCourse = Object.keys(coursesData)[0];
+            isUsingSharedData = false;
             saveData();
             initMod0();
-            showFeedback("✅ 已恢复默认预设词库！");
+            showFeedback("✅ 已从 GitHub 云端同步最新词库！");
         }
     }
     
@@ -722,7 +758,7 @@
     function drawGrid(canvas, ctx) { ctx.save(); ctx.strokeStyle = "#ffebee"; ctx.lineWidth = 2; ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(0, canvas.height/2); ctx.lineTo(canvas.width, canvas.height/2); ctx.moveTo(canvas.width/2, 0); ctx.lineTo(canvas.width/2, canvas.height); ctx.moveTo(0,0); ctx.lineTo(canvas.width, canvas.height); ctx.moveTo(canvas.width, 0); ctx.lineTo(0, canvas.height); ctx.stroke(); ctx.restore(); }
     function clearAllCanvases() { canvasContexts.forEach(obj => { obj.ctx.clearRect(0, 0, obj.canvas.width, obj.canvas.height); drawGrid(obj.canvas, obj.ctx); }); }
 
-    // ================= 板块七：补齐词语 (填空挑战，已修复重玩报错) =================
+    // ================= 板块七：补齐词语 =================
     let mod7Queue = []; let mod7Total = 0; let mod7CurrentWord = null; let mod7HiddenIndex = -1;
     
     function initMod7() {
@@ -809,11 +845,59 @@
         });
     }
 
-    // 初始化
-    window.onload = () => {
+    // ================= 初始化入口 =================
+    window.onload = async () => {
         if (isStudentMode) {
             document.getElementById("btn-teacher-nav").style.display = "none";
         }
+
+        remoteLessonsData = await fetchRemoteLessons();
+
+        if (sharedDataParam) {
+            try {
+                const decoded = decodeCoursesFromParam(sharedDataParam);
+                if (Object.keys(decoded).length > 0) {
+                    coursesData = decoded;
+                    isUsingSharedData = true;
+                }
+            } catch (e) {}
+        } else if (isStudentMode) {
+            if (remoteLessonsData) {
+                coursesData = JSON.parse(JSON.stringify(remoteLessonsData));
+                isUsingSharedData = true;
+            } else {
+                const saved = localStorage.getItem('myChineseCourses');
+                if (saved) { try { coursesData = JSON.parse(saved); } catch(e) {} }
+            }
+        } else {
+            // 老师模式：优先读取你当前浏览器已经输入的生词，绝不丢失！
+            const saved = localStorage.getItem('myChineseCourses');
+            if (saved) {
+                try { coursesData = JSON.parse(saved); } catch(e) {}
+            } else if (remoteLessonsData) {
+                coursesData = JSON.parse(JSON.stringify(remoteLessonsData));
+            }
+        }
+
+        // 如果链接指定了某特定课程 (例如 ?s=1&c=0)，学生模式只保留那一课
+        const courseKeys = Object.keys(coursesData);
+        if (isStudentMode && targetCourseParam !== null) {
+            let matchedCourse = null;
+            if (/^\d+$/.test(targetCourseParam)) {
+                const idx = parseInt(targetCourseParam, 10);
+                if (idx >= 0 && idx < courseKeys.length) matchedCourse = courseKeys[idx];
+            } else if (coursesData[targetCourseParam]) {
+                matchedCourse = targetCourseParam;
+            }
+            if (matchedCourse) {
+                coursesData = { [matchedCourse]: coursesData[matchedCourse] };
+            }
+        }
+
+        const savedActive = !isUsingSharedData ? localStorage.getItem('activeChineseCourse') : null;
+        activeCourse = (savedActive && coursesData[savedActive]) ? savedActive : Object.keys(coursesData)[0];
+        vocabList = coursesData[activeCourse];
+
         renderSidebarCourseSelect();
         initMod1();
     };
