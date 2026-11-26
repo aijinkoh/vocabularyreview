@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>进阶版生词复习游乐园</title>
-    <!-- 引入自动生成拼音的库 -->
-    <script src="https://unpkg.com/pinyin-pro"></script>
+    <!-- 引入自动生成拼音的库（带备用线路） -->
+    <script src="https://unpkg.com/pinyin-pro" onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/pinyin-pro';document.head.appendChild(s);"></script>
     <style>
         :root {
             --primary: #4CAF50;
@@ -193,7 +193,7 @@
                 <hr style="margin: 20px 0;">
                 <div style="background: #F0F8FF; padding: 15px; border-radius: 10px; border: 1px solid #bbdefb;">
                     <h3 style="margin-top:0; color:#1976D2;">✨ 极速添加生词</h3>
-                    <p style="color: #555; margin-bottom: 15px;">💡 <b>操作秘籍</b>：在汉字框输入后按 <kbd>Enter 键</kbd> 自动翻译，再按一次 <kbd>Enter 键</kbd> 直接录入系统！双手无需离开键盘。</p>
+                    <p style="color: #555; margin-bottom: 15px;">💡 <b>操作秘籍</b>：在汉字框输入后按 <kbd>Enter 键</kbd> 自动翻译，再按一次 <kbd>Enter 键</kbd> 直接录入系统！如果偶尔翻译失败，也可直接手动输入英文意思。</p>
                     
                     <input type="text" id="new-word" placeholder="汉字 (如: 苹果)" required onkeydown="handleWordEnter(event)" onblur="handleWordBlur()">
                     <input type="text" id="new-pinyin" placeholder="拼音 (自动生成)" required onkeydown="if(event.key==='Enter') addWord();">
@@ -629,6 +629,41 @@
         }
     }
 
+    // 三引擎自动翻译（Google 主线路 -> Google 备用线路 -> MyMemory 免费翻译）
+    async function translateZhToEn(text) {
+        // 引擎 1：Google gtx
+        try {
+            const res1 = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=zh-CN&tl=en&dt=t&q=${encodeURIComponent(text)}`);
+            if (res1.ok) {
+                const d1 = await res1.json();
+                if (d1 && d1[0] && d1[0][0] && d1[0][0][0]) return d1[0][0][0];
+            }
+        } catch (e) {}
+
+        // 引擎 2：Google Chrome 插件接口
+        try {
+            const res2 = await fetch(`https://translate.googleapis.com/translate_a/single?client=dict-chrome-ex&sl=zh-CN&tl=en&dt=t&q=${encodeURIComponent(text)}`);
+            if (res2.ok) {
+                const d2 = await res2.json();
+                if (d2 && d2[0] && d2[0][0] && d2[0][0][0]) return d2[0][0][0];
+                if (d2 && d2.sentences && d2.sentences[0] && d2.sentences[0].trans) return d2.sentences[0].trans;
+            }
+        } catch (e) {}
+
+        // 引擎 3：MyMemory 免费接口
+        try {
+            const res3 = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=zh-CN|en`);
+            if (res3.ok) {
+                const d3 = await res3.json();
+                if (d3 && d3.responseStatus === 200 && d3.responseData && d3.responseData.translatedText) {
+                    return d3.responseData.translatedText;
+                }
+            }
+        } catch (e) {}
+
+        return null;
+    }
+
     async function autoFillWordData() { 
         let wInput = document.getElementById("new-word").value.trim(); 
         let pInput = document.getElementById("new-pinyin"); 
@@ -636,16 +671,20 @@
         let tip = document.getElementById("autofill-tip"); 
         if (!wInput) return; 
         
+        tip.style.color = "var(--primary)";
         tip.innerText = "⏳ 正在自动生成..."; 
         if (window.pinyinPro) pInput.value = pinyinPro.pinyin(wInput); 
         
-        try { 
-            let res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=zh-CN&tl=en&dt=t&q=${encodeURIComponent(wInput)}`); 
-            let data = await res.json(); 
-            if(data && data[0] && data[0][0] && data[0][0][0]) mInput.value = data[0][0][0]; 
+        const translated = await translateZhToEn(wInput);
+        if (translated) {
+            mInput.value = translated;
+            tip.style.color = "var(--primary)";
             tip.innerText = "✨ 生成成功！(再次按 Enter 添加)"; 
-            setTimeout(() => tip.innerText="", 3000); 
-        } catch(e) { tip.innerText = "⚠️ 翻译失败，请手动填写。"; } 
+            setTimeout(() => tip.innerText = "", 3000);
+        } else {
+            tip.style.color = "#E65100";
+            tip.innerText = "⚠️ 自动翻译暂不可用，请手动填写含义后按 Enter 添加。";
+        }
     }
     
     function changeCourse() { activeCourse = document.getElementById("course-select").value; saveData(); renderVocabTable(); showFeedback(`已切换至课程: ${activeCourse}`); }
@@ -870,7 +909,6 @@
                 if (saved) { try { coursesData = JSON.parse(saved); } catch(e) {} }
             }
         } else {
-            // 老师模式：优先读取你当前浏览器已经输入的生词，绝不丢失！
             const saved = localStorage.getItem('myChineseCourses');
             if (saved) {
                 try { coursesData = JSON.parse(saved); } catch(e) {}
@@ -879,7 +917,6 @@
             }
         }
 
-        // 如果链接指定了某特定课程 (例如 ?s=1&c=0)，学生模式只保留那一课
         const courseKeys = Object.keys(coursesData);
         if (isStudentMode && targetCourseParam !== null) {
             let matchedCourse = null;
